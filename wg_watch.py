@@ -303,7 +303,10 @@ def enrich_ad(ad: dict[str, str | None]) -> dict[str, str | None]:
 
 
 def format_telegram_message(ad: dict[str, str | None]) -> str:
-    lines = ["🚨 NEUE WG IN MÜNSTER", ""]
+    # The ad title goes first, not a fixed header, so it shows up in the
+    # Telegram push-notification preview (which only shows the first line).
+    title = str(ad.get("title") or "WG-Gesucht Anzeige")
+    lines = [f"🚨 {title}", ""]
 
     if ad.get("district"):
         lines.append(f"📍 {ad['district']}")
@@ -320,9 +323,6 @@ def format_telegram_message(ad: dict[str, str | None]) -> str:
     if any(ad.get(k) for k in ("district", "price", "size", "move_in")):
         lines.append("")
 
-    title = str(ad.get("title") or "WG-Gesucht Anzeige")
-    lines.append(title)
-    lines.append("")
     lines.append(f"👉 {ad['url']}")
 
     return "\n".join(lines)

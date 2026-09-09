@@ -8,6 +8,8 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE_URL = "https://www.wg-gesucht.de"
 SEARCH_URL = os.getenv(
@@ -31,6 +33,13 @@ HEADERS = {
     ),
     "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
 }
+
+# Retries only cover idempotent methods (GET by default), so a lost/garbled
+# response to the Telegram POST never gets silently resent.
+SESSION = requests.Session()
+_retry = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+SESSION.mount("https://", HTTPAdapter(max_retries=_retry))
+SESSION.mount("http://", HTTPAdapter(max_retries=_retry))
 
 AD_ID_RE = re.compile(r"\.(\d{6,12})\.html(?:$|[?#])")
 PRICE_RE = re.compile(r"(\d{2,5})\s*€")
@@ -74,7 +83,7 @@ def send_telegram(text: str) -> None:
         )
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    response = requests.post(
+    response = SESSION.post(
         url,
         json={
             "chat_id": TELEGRAM_CHAT_ID,
@@ -149,7 +158,7 @@ def fetch_ad_details(url: str) -> dict[str, str | None]:
     Fetch the individual ad page and extract additional details.
     This is only called for newly discovered ads, so it adds very little load.
     """
-    response = requests.get(url, headers=HEADERS, timeout=30)
+    response = SESSION.get(url, headers=HEADERS, timeout=30)
     response.raise_for_status()
 
     html = response.text
@@ -184,7 +193,7 @@ def fetch_ad_details(url: str) -> dict[str, str | None]:
 
 
 def fetch_ads() -> list[dict[str, str | None]]:
-    response = requests.get(
+    response = SESSION.get(
         SEARCH_URL,
         headers=HEADERS,
         timeout=30,

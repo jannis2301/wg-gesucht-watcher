@@ -334,7 +334,10 @@ def format_telegram_message(ad: dict[str, str | None]) -> str:
 
 def main() -> int:
     seen = load_seen()
-    first_run = not SEEN_FILE.exists()
+    # Based on emptiness, not file existence, so manually clearing the file
+    # to reset tracking (e.g. after changing WG_SEARCH_URL) is just as safe
+    # as deleting it — neither triggers a mass-send of everything visible.
+    first_run = not seen
 
     ads = fetch_ads()
     current_ids = {str(ad["id"]) for ad in ads}

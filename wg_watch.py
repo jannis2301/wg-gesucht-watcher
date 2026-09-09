@@ -50,6 +50,11 @@ AD_ID_RE = re.compile(r"\.(\d{6,12})\.html(?:$|[?#])")
 # appears on the real "are you human" interstitial.
 BOT_CHECK_RE = re.compile(r"bitte bestätigen sie, dass sie ein mensch sind", re.I)
 PRICE_RE = re.compile(r"(\d{2,5})\s*€")
+# Detail pages carry a "Schon ab 35,58 € - boosten Sie..." promo banner near
+# the top, before the actual price. Its decimal comma defeats PRICE_RE
+# (matching only the "58" after the comma), so prefer the labeled total-rent
+# field when present and only fall back to the generic pattern otherwise.
+TOTAL_RENT_RE = re.compile(r"Gesamtmiete\s*:?\s*(\d{2,5})\s*€", re.I)
 SIZE_RE = re.compile(r"(\d{1,3}(?:[.,]\d+)?)\s*m²", re.I)
 DATE_RE = re.compile(
     r"(?:ab|frei ab|verfügbar ab)\s*[:\-]?\s*"
@@ -141,9 +146,13 @@ def extract_summary_fields(text: str, url: str) -> dict[str, str | None]:
     size = None
     move_in = None
 
-    price_match = PRICE_RE.search(text)
-    if price_match:
-        price = f"{price_match.group(1)} €"
+    total_rent_match = TOTAL_RENT_RE.search(text)
+    if total_rent_match:
+        price = f"{total_rent_match.group(1)} €"
+    else:
+        price_match = PRICE_RE.search(text)
+        if price_match:
+            price = f"{price_match.group(1)} €"
 
     size_match = SIZE_RE.search(text)
     if size_match:

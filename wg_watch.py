@@ -100,16 +100,19 @@ def normalize_text(text: str) -> str:
 
 
 def extract_district(text: str, url: str) -> str | None:
-    combined = f"{text} {url}".lower()
-
-    for district in MUNSTER_DISTRICTS:
-        if district.lower() in combined:
-            return district
-
-    # Fallback from URL, e.g. ...Muenster-Centrum.12345678.html
+    # The URL slug is the most reliable source, e.g.
+    # ...Muenster-Kreuzviertel.12345678.html
     m = re.search(r"Muenster-([A-Za-zÄÖÜäöüß\-]+)\.\d+\.html", url)
     if m:
         return m.group(1).replace("-", " ")
+
+    # Fallback: match a known district as a whole word/phrase in the free
+    # text. A plain substring check would also fire on ordinary German
+    # words that happen to share a district's name (e.g. "Geist", "Hafen").
+    for district in MUNSTER_DISTRICTS:
+        pattern = r"\b" + re.escape(district) + r"\b"
+        if re.search(pattern, text, re.I):
+            return district
 
     return None
 

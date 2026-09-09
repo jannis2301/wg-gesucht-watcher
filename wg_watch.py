@@ -42,6 +42,13 @@ SESSION.mount("https://", HTTPAdapter(max_retries=_retry))
 SESSION.mount("http://", HTTPAdapter(max_retries=_retry))
 
 AD_ID_RE = re.compile(r"\.(\d{6,12})\.html(?:$|[?#])")
+# Matching the plain words "captcha" or "cloudflare" is unreliable on this
+# site: normal WG-Gesucht pages embed a reCAPTCHA widget in the contact
+# form, a hidden validation placeholder for it, and reference recaptcha.net
+# in a cookie-consent script — all three contain "captcha" without any bot
+# check being shown. The German confirmation phrase is what actually only
+# appears on the real "are you human" interstitial.
+BOT_CHECK_RE = re.compile(r"bitte bestätigen sie, dass sie ein mensch sind", re.I)
 PRICE_RE = re.compile(r"(\d{2,5})\s*€")
 SIZE_RE = re.compile(r"(\d{1,3}(?:[.,]\d+)?)\s*m²", re.I)
 DATE_RE = re.compile(
@@ -153,6 +160,10 @@ def extract_summary_fields(text: str, url: str) -> dict[str, str | None]:
     }
 
 
+def looks_like_bot_check(html: str) -> bool:
+    return bool(BOT_CHECK_RE.search(html))
+
+
 def fetch_ad_details(url: str) -> dict[str, str | None]:
     """
     Fetch the individual ad page and extract additional details.
@@ -162,12 +173,8 @@ def fetch_ad_details(url: str) -> dict[str, str | None]:
     response.raise_for_status()
 
     html = response.text
-    lower_html = html.lower()
 
-    if (
-        "bitte bestätigen sie, dass sie ein mensch sind" in lower_html
-        or "captcha" in lower_html
-    ):
+    if looks_like_bot_check(html):
         return {}
 
     soup = BeautifulSoup(html, "html.parser")
@@ -201,13 +208,8 @@ def fetch_ads() -> list[dict[str, str | None]]:
     response.raise_for_status()
 
     html = response.text
-    lower_html = html.lower()
 
-    if (
-        "bitte bestätigen sie, dass sie ein mensch sind" in lower_html
-        or "captcha" in lower_html
-        or "cloudflare" in lower_html
-    ):
+    if looks_like_bot_check(html):
         raise RuntimeError(
             "WG-Gesucht liefert momentan eine Bot-/Captcha-Prüfung."
         )

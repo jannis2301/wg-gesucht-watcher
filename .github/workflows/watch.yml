@@ -40,6 +40,7 @@ jobs:
         run: python wg_watch.py
 
       - name: Neue Seen-Liste speichern
+        if: ${{ !cancelled() }}
         run: |
           if git diff --quiet -- seen_ads.json && git diff --cached --quiet; then
             echo "Keine Änderung an seen_ads.json."

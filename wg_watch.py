@@ -323,18 +323,34 @@ def main() -> int:
     ]
     new_ads.sort(key=lambda ad: int(str(ad["id"])))
 
+    failed_ids: set[str] = set()
+
     for ad in new_ads:
-        ad = enrich_ad(ad)
-        message = format_telegram_message(ad)
+        ad_id = str(ad["id"])
+        try:
+            ad = enrich_ad(ad)
+            message = format_telegram_message(ad)
+            send_telegram(message)
+            print(f"Telegram gesendet: {ad_id} | {ad.get('title')}")
+        except Exception as exc:
+            # Mark as failed instead of aborting, so ads that were already
+            # sent successfully in this run aren't resent next time.
+            print(f"FEHLER beim Senden von Anzeige {ad_id}: {exc}", file=sys.stderr)
+            failed_ids.add(ad_id)
+            continue
 
-        send_telegram(message)
-        print(f"Telegram gesendet: {ad['id']} | {ad.get('title')}")
+        seen.add(ad_id)
+        save_seen(seen)
 
-    seen.update(current_ids)
+    # Everything visible now counts as seen, except ads we failed to send —
+    # those stay unseen so they're retried on the next run.
+    seen.update(current_ids - failed_ids)
     save_seen(seen)
 
-    print(f"{len(new_ads)} neue Anzeige(n).")
-    return 0
+    sent_count = len(new_ads) - len(failed_ids)
+    print(f"{sent_count} neue Anzeige(n) gesendet, {len(failed_ids)} fehlgeschlagen.")
+
+    return 1 if failed_ids else 0
 
 
 if __name__ == "__main__":

@@ -75,9 +75,13 @@ def load_seen() -> set[str]:
         return set()
     try:
         data = json.loads(SEEN_FILE.read_text(encoding="utf-8"))
-        return {str(x) for x in data}
-    except (json.JSONDecodeError, OSError):
-        return set()
+    except (json.JSONDecodeError, OSError) as exc:
+        # Treating a corrupt file as "no ads known yet" would make every
+        # currently visible ad look new and spam Telegram with re-sends.
+        # Fail loudly instead, consistent with the other error paths here.
+        raise RuntimeError(f"{SEEN_FILE} ist beschädigt oder unlesbar: {exc}") from exc
+
+    return {str(x) for x in data}
 
 
 def save_seen(seen: set[str]) -> None:

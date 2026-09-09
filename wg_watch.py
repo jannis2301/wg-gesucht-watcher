@@ -103,7 +103,10 @@ def send_telegram(text: str) -> None:
 
 
 def looks_like_offer(href: str) -> bool:
-    low = href.lower()
+    # Check the path only: the domain itself is "wg-gesucht.de", so running
+    # this against the full URL would match "-gesucht." on every single
+    # link and exclude everything.
+    low = urlparse(href).path.lower()
 
     if "-gesucht." in low or "/gesuche" in low:
         return False

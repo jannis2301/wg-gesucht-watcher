@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -14,6 +15,10 @@ SEARCH_URL = os.getenv(
     "https://www.wg-gesucht.de/wg-zimmer/muenster",
 )
 SEEN_FILE = Path(os.getenv("SEEN_FILE", "seen_ads.json"))
+
+# Pause between detail-page fetches so a batch of several new ads doesn't
+# hit WG-Gesucht with back-to-back requests and trip the bot/captcha check.
+DETAIL_FETCH_DELAY_SECONDS = 2
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -325,8 +330,10 @@ def main() -> int:
 
     failed_ids: set[str] = set()
 
-    for ad in new_ads:
+    for index, ad in enumerate(new_ads):
         ad_id = str(ad["id"])
+        if index > 0:
+            time.sleep(DETAIL_FETCH_DELAY_SECONDS)
         try:
             ad = enrich_ad(ad)
             message = format_telegram_message(ad)

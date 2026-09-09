@@ -1,0 +1,54 @@
+name: WG-Gesucht Watcher
+
+on:
+  schedule:
+    # GitHub Actions erlaubt als kleinstes Intervall 5 Minuten.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wg-gesucht-watcher
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: WG-Gesucht prüfen
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          WG_SEARCH_URL: ${{ vars.WG_SEARCH_URL }}
+        run: python wg_watch.py
+
+      - name: Neue Seen-Liste speichern
+        run: |
+          if git diff --quiet -- seen_ads.json && git diff --cached --quiet; then
+            echo "Keine Änderung an seen_ads.json."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add seen_ads.json
+          git commit -m "Update seen WG-Gesucht ads [skip ci]"
+          git push
